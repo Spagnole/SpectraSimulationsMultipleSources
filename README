@@ -34,14 +34,16 @@ Step to perform
 >	GetSpectrumBackground(hRealSpectra); //extracts exp background!
 
 Please see comments in code for more information!
-
+The ReadDecayScheme("TransitionList.dat") function can be entered multuple times to add different sources of gamma-decay
+For example if you have 152Eu decay data, you can use a separate file for transitions in 152Gd and 152Sm.
+See example files for this.
 
 SimulateSingles.cc info
 Requires the previous input from the ReadInputData.cc code!
 Functions	
-	FillSimulation(); //fills the simulated full energy peaks
-	FillEscapePeaks(); //fills the simulated escape peaks
-	BuildSimuledSpectra(hSimPeaks,hBkgr,hEscPeaks); //adds the simulated peaks to the extracted background
+	FillSimulation(source_number); //fills the simulated full energy peaks
+	FillEscapePeaks(source_number); //fills the simulated escape peaks
+	BuildSimuledSpectra(); //adds the simulated peaks to the extracted background
 
 Run the RunSimulateSinglesExample.cc with the ExampleFile.root to see the output!
 
@@ -52,14 +54,14 @@ Again this code requires the input from the ReadInputData.cc code
 It does not require anything from the SimulateSingles.cc code
 The code requires the following functions be performed
 
-	GetLevelList(); //requires no arguments
-	FixTransitionList(); //requires no arguments
-	CalcLevelFeedingAndGammaBR(); //requires no arguments
-	FindCoincidences(); //requires no arguments
-	ReduceGammaGammaList(); //requires no arguments
-	FillCoincMatrix( Nbins, lower_bound, upper_bound ); //can provide desired binning
-	GateOnSimMat( Gate_low, Gate_high ); //best to give same gate used for experimental spectra
-	FillEscPeakSpec(SimMatProj); //must give simulated coinc. spectrum
-	BuildSimuledSpectra(SimMatProj,hBkgr,hEscPeak); //must give all three spectra
+	GetLevelList(source_number); //requires no arguments
+	FixTransitionList(source_number); //requires no arguments
+	CalcLevelFeedingAndGammaBR(source_number); //requires no arguments
+	FindCoincidences(source_number); //requires no arguments
+	ReduceGammaGammaList(source_number); //requires no arguments
+	FillCoincMatrix( source_number ); //uses binning from experiment as default settings but user can provide different  binning desired
+	GateOnSimMat( source_number, Gate_low, Gate_high ); //best to give same gate used for experimental spectra
+	FillEscPeakSpec(source_number); //just uses source number
+	BuildSimuledSpectra(); //no options to provide function
 
 
