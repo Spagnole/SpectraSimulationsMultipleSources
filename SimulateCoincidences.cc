@@ -119,6 +119,27 @@ void CalcLevelFeedingAndGammaBR(int source_number){
 }
 
 
+void AddToCoincidenceList(int source_number, vector<int> feeder_index, int decay_index, double intensity ){
+
+	double decay_energy = get<1>(AssignedTransition[source_number].at(decay_index));
+	for(int i = 0; i < feeder_index.size(); i++){
+		double feeder_energy = get<1>(AssignedTransition[source_number].at( feeder_index.at(i) ) );	
+		gg_coinc[source_number].push_back( make_tuple(feeder_energy,decay_energy, intensity) );
+	}
+}
+
+void PrintUnfinishedCascade(int source_number, vector<int> list){
+
+	cout  << "WARNING!!! Cascade not finished"<<endl;	
+	for(int x = 0; x < list.size(); x++){
+		int y = list.at(x);
+		for(int z = 0; z < x; z++) cout <<"\t";
+		cout << get<0>(AssignedTransition[source_number].at(y)) << " --> " << 
+		get<1>(AssignedTransition[source_number].at(y)) << " --> " << get<2>(AssignedTransition[source_number].at(y)) << endl;
+	}
+	cout << "User can add nested loops for FindCoincidences() function!");
+}
+
 //this function calculates the expected number of gamma-gamma coincidences
 //this function uses a large number of nested loops (Should be replaced by some recursive loop?)
 //if a gamma-gamma coincidence is separated by about 5 intermediate gamma-rays it will not be added to the list of coincidences
@@ -140,61 +161,33 @@ void FindCoincidences(int source_number){
 		for(int j = i-1; j >= 0 ; j--){
 			if( get<2>(AssignedTransition[source_number].at(i)) == get<0>(AssignedTransition[source_number].at(j))){
 				Ngg[0] = NDecays*get<5>(AssignedTransition[source_number].at(j));
-				gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(i)), get<1>(AssignedTransition[source_number].at(j)), Ngg[0]));
-				if(PrintFindingCoincidences) cout << get<0>(AssignedTransition[source_number].at(i)) << "\t" << get<1>(AssignedTransition[source_number].at(i)) << "\t" << get<2>(AssignedTransition[source_number].at(i)) << "\t";
-				if(PrintFindingCoincidences) cout << get<1>(AssignedTransition[source_number].at(j)) << "\t" << get<2>(AssignedTransition[source_number].at(j)) << "\t" << Ngg[0] << endl;
-				//cout << get<0>(AssignedTransition[source_number].at(i)) << "\t" << get<1>(AssignedTransition[source_number].at(i)) << "\t" << get<2>(AssignedTransition[source_number].at(i)) << endl;
-				//cout << "\t" << get<0>(AssignedTransition[source_number].at(j)) << "\t" << get<1>(AssignedTransition[source_number].at(j)) << "\t" << get<2>(AssignedTransition[source_number].at(j)) << endl;
+				AddToCoincidenceList(source_number,{i},j, Ngg[0] );
 				if( get<2>(AssignedTransition[source_number].at(j))  == 0 ) continue;
 				for(int k = j-1; k >= 0 ; k--){
 					if( get<2>(AssignedTransition[source_number].at(j)) == get<0>(AssignedTransition[source_number].at(k))){
 						Ngg[1] = Ngg[0]*get<5>(AssignedTransition[source_number].at(k));
-						gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(i)), get<1>(AssignedTransition[source_number].at(k)), Ngg[1]));
-						gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(j)), get<1>(AssignedTransition[source_number].at(k)), Ngg[1]));
-						if(PrintFindingCoincidences) cout << "\t\t" << get<1>(AssignedTransition[source_number].at(k)) << "\t" << get<2>(AssignedTransition[source_number].at(k)) << "\t" << Ngg[1] << endl;
-						//cout << "\t\t" << get<0>(AssignedTransition[source_number].at(k)) << "\t" << get<1>(AssignedTransition[source_number].at(k)) << "\t" << get<2>(AssignedTransition[source_number].at(k)) << endl;
+						AddToCoincidenceList(source_number,{i,j},k, Ngg[1] );
 						if( get<2>(AssignedTransition[source_number].at(k))  == 0 ) continue;
 						for(int l = k-1; l >= 0 ; l--){
 							if( get<2>(AssignedTransition[source_number].at(k)) == get<0>(AssignedTransition[source_number].at(l))){
 								Ngg[2] = Ngg[1]*get<5>(AssignedTransition[source_number].at(l));
-								gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(i)), get<1>(AssignedTransition[source_number].at(l)), Ngg[2]));
-								gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(j)), get<1>(AssignedTransition[source_number].at(l)), Ngg[2]));
-								gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(k)), get<1>(AssignedTransition[source_number].at(l)), Ngg[2]));
-								if(PrintFindingCoincidences) cout << "\t\t\t" << get<1>(AssignedTransition[source_number].at(l)) << "\t" << get<2>(AssignedTransition[source_number].at(l)) << "\t" << Ngg[2] << endl;
-								//cout << "\t\t\t" << get<0>(AssignedTransition[source_number].at(l)) << "\t" << get<1>(AssignedTransition[source_number].at(l)) << "\t" << get<2>(AssignedTransition[source_number].at(l)) << endl;
+								AddToCoincidenceList(source_number,{i,j,k},l, Ngg[2] );
 								if( get<2>(AssignedTransition[source_number].at(l))  == 0 ) continue;
 								for(int m = l-1; m >= 0 ; m--){
 									if( get<2>(AssignedTransition[source_number].at(l)) == get<0>(AssignedTransition[source_number].at(m))){
 										Ngg[3] = Ngg[2]*get<5>(AssignedTransition[source_number].at(m));
-										gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(i)), get<1>(AssignedTransition[source_number].at(m)), Ngg[3]));
-										gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(j)), get<1>(AssignedTransition[source_number].at(m)), Ngg[3]));
-										gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(k)), get<1>(AssignedTransition[source_number].at(m)), Ngg[3]));
-										gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(l)), get<1>(AssignedTransition[source_number].at(m)), Ngg[3]));
-										if(PrintFindingCoincidences) cout << "\t\t\t\t" << get<0>(AssignedTransition[source_number].at(m)) << "\t" << get<1>(AssignedTransition[source_number].at(m)) << "\t" <<  Ngg[3] << endl;
+										AddToCoincidenceList(source_number,{i,j,k,l},m, Ngg[3] );
 										if( get<2>(AssignedTransition[source_number].at(m))  == 0 ) continue;
 										for(int n = m-1; n >= 0 ; n--){
 											if( get<2>(AssignedTransition[source_number].at(m)) == get<0>(AssignedTransition[source_number].at(n))){
 												Ngg[4] = Ngg[3]*get<5>(AssignedTransition[source_number].at(n));
-												gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(i)), get<1>(AssignedTransition[source_number].at(n)), Ngg[4]));
-												gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(j)), get<1>(AssignedTransition[source_number].at(n)), Ngg[4]));
-												gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(k)), get<1>(AssignedTransition[source_number].at(n)), Ngg[4]));
-												gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(l)), get<1>(AssignedTransition[source_number].at(n)), Ngg[4]));
-												gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(m)), get<1>(AssignedTransition[source_number].at(n)), Ngg[4]));
-												if(PrintFindingCoincidences) cout << "\t\t\t\t\t" << get<0>(AssignedTransition[source_number].at(n)) << "\t" << get<1>(AssignedTransition[source_number].at(n)) << "\t" << Ngg[4] << endl;
+												AddToCoincidenceList(source_number,{i,j,k,l,m},n, Ngg[4] );
 												if( get<2>(AssignedTransition[source_number].at(n))  == 0 ) continue;
 												for(int p = n-1; p >= 0 ; p--){
 													if( get<2>(AssignedTransition[source_number].at(n)) == get<0>(AssignedTransition[source_number].at(p))){
 														Ngg[5] = Ngg[4]*get<5>(AssignedTransition[source_number].at(p));
-														gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(i)), get<1>(AssignedTransition[source_number].at(p)), Ngg[5]));
-														gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(j)), get<1>(AssignedTransition[source_number].at(p)), Ngg[5]));
-														gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(k)), get<1>(AssignedTransition[source_number].at(p)), Ngg[5]));
-														gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(l)), get<1>(AssignedTransition[source_number].at(p)), Ngg[5]));
-														gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(m)), get<1>(AssignedTransition[source_number].at(p)), Ngg[5]));
-														gg_coinc[source_number].push_back(make_tuple(get<1>(AssignedTransition[source_number].at(n)), get<1>(AssignedTransition[source_number].at(p)), Ngg[5]));
-														if( get<2>(AssignedTransition[source_number].at(p)) !=0){
-															//cout  << "WARNING"<<endl;
-															cout << "\t\t\t\t\t\t" << get<0>(AssignedTransition[source_number].at(n)) << "\t" << get<1>(AssignedTransition[source_number].at(n)) << "\t" <<Ngg[5] << endl;
-														}
+														AddToCoincidenceList(source_number,{i,j,k,l,m,n},p, Ngg[5] );
+														if( get<2>(AssignedTransition[source_number].at(p)) !=0) PrintUnfinishedCascade(source_number,{i,j,k,l,m,n});
 													}
 												}
 											}
@@ -228,6 +221,14 @@ void ReduceGammaGammaList(int source_number){
 				j=j-1;
 			}
 		}
+	}
+}
+
+void PrintCoincidences(int source_number, string filename){
+	
+	ofstream outfile( filename.c_str() );
+	for(int i = 0; i < gg_coinc[source_number].size();i++){
+		outfile << get<0>(gg_coinc[source_number].at(i)) << "\t" << get<1>(gg_coinc[source_number].at(i)) << "\t"  << get<2>(gg_coinc[source_number].at(i)) <<endl;
 	}
 }
 
@@ -279,6 +280,8 @@ void GateOnSimMat(int source_number, int low, int up){
 //this is done by using the output TH1D from the GateOnSimMat() function
 void FillEscPeakSpec(int source_number){
 
+	if( gEscPeaks == NULL ) return;
+
 	int Nbins = hSimPeaks[source_number]->GetXaxis()->GetNbins();
 	double low = hSimPeaks[source_number]->GetXaxis()->GetBinLowEdge(1);
 	double upp = hSimPeaks[source_number]->GetXaxis()->GetBinUpEdge(Nbins);
@@ -317,7 +320,7 @@ void BuildSimuledSpectra(){
 		hSimSource[i]->SetLineColor( hist_colors[i] );
 		hSimSource[i]->Add(hBkgr);
 		hSimSource[i]->Add(hSimPeaks[i]);
-		hSimSource[i]->Add(hEscPeaks[i]);
+		if( hEscPeaks[i] != NULL )hSimSource[i]->Add(hEscPeaks[i]);
 		hFullSim->Add(hSimPeaks[i]);
 		hFullSim->Add(hEscPeaks[i]);
 	}
