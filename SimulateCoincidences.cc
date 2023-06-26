@@ -137,7 +137,7 @@ void PrintUnfinishedCascade(int source_number, vector<int> list){
 		cout << get<0>(AssignedTransition[source_number].at(y)) << " --> " << 
 		get<1>(AssignedTransition[source_number].at(y)) << " --> " << get<2>(AssignedTransition[source_number].at(y)) << endl;
 	}
-	cout << "User can add nested loops for FindCoincidences() function!");
+	cout << "User can add nested loops for FindCoincidences() function!";
 }
 
 //this function calculates the expected number of gamma-gamma coincidences
