@@ -12,6 +12,8 @@ vector<tuple<double,double,double>> gg_coinc[NSources];
 
 TH2D *sim_gg_mat[NSources];
 TH1D *SimMatProj[NSources];
+TH1D *SimEscMatProj[NSources];
+TH1D *SimEscGatedSpectra[NSources];
 //TH1D *hEscPeaks[NSources];
 //TH1D *hSourceSimSpectrum[NSources];
 //TH1D *hFullSim;
@@ -137,7 +139,7 @@ void PrintUnfinishedCascade(int source_number, vector<int> list){
 		cout << get<0>(AssignedTransition[source_number].at(y)) << " --> " << 
 		get<1>(AssignedTransition[source_number].at(y)) << " --> " << get<2>(AssignedTransition[source_number].at(y)) << endl;
 	}
-	cout << "User can add nested loops for FindCoincidences() function!";
+	cout << "User can add nested loops for FindCoincidences() function!\n";
 }
 
 //this function calculates the expected number of gamma-gamma coincidences
@@ -274,6 +276,15 @@ void GateOnSimMat(int source_number, int low, int up){
 	hSimPeaks[source_number]->SetFillColor(kRed);
 	hSimPeaks[source_number]->SetFillStyle(3000);
 	
+	double MeanEnergy = ( (double)low + (double)up )/2.;
+	if( MeanEnergy > 1000. && gEscPeaks != NULL){
+		SimEscMatProj[source_number]  = sim_gg_mat[source_number]->ProjectionY(Form("SimEscProj_%s_%d_%d",source_name.at(source_number).c_str(),low+511,up+511),low+511,up+511);		
+		SimEscMatProj[source_number]->Scale(fEscPeak->Eval(MeanEnergy));
+		//SimEscGatedSpectra[source_number] = SimEscMatProj[source_number]->Clone();
+		SimEscGatedSpectra[source_number] = new TH1D(*SimEscMatProj[source_number]);
+		SimEscGatedSpectra[source_number]->SetName( Form("SimGateOnEscPeak_%s_%d_%d",source_name.at(source_number).c_str(),low+511,up+511) );
+		SimEscGatedSpectra[source_number]->SetTitle( Form("Sim. Gated Spectra Gate on Escape Peak Source:%s, %d - %d",source_name.at(source_number).c_str(),low+511,up+511) );
+	}
 }
 
 //this function fills the simulated escape peaks 
@@ -313,6 +324,8 @@ void BuildSimuledSpectra(){
 	hFullSim->SetLineColor(kRed);
 	hFullSim->Add(hBkgr);
 	
+
+	
 	int hist_colors[] = {6, 417, 1, 900-4, 432, 801, 880, 861, 625, 416};
 	for(int i = 0; i < used_sources; i++){
 		cout << i << endl;
@@ -320,7 +333,14 @@ void BuildSimuledSpectra(){
 		hSimSource[i]->SetLineColor( hist_colors[i] );
 		hSimSource[i]->Add(hBkgr);
 		hSimSource[i]->Add(hSimPeaks[i]);
-		if( hEscPeaks[i] != NULL )hSimSource[i]->Add(hEscPeaks[i]);
+		if( hEscPeaks[i] != NULL ) hSimSource[i]->Add(hEscPeaks[i]);
+		if( SimEscGatedSpectra[i] != NULL){
+			SimEscGatedSpectra[i]->Add(hBkgr);
+			SimEscGatedSpectra[i]->SetLineColor( hist_colors[i] );
+			SimEscGatedSpectra[i]->SetFillColor( hist_colors[i] );
+			SimEscGatedSpectra[i]->SetFillStyle(3144);
+			hFullSim->Add( SimEscMatProj[i] );
+		}		
 		hFullSim->Add(hSimPeaks[i]);
 		hFullSim->Add(hEscPeaks[i]);
 	}
@@ -329,10 +349,12 @@ void BuildSimuledSpectra(){
 	hRealSpectra->SetFillColor(kBlue);
 	hRealSpectra->SetFillStyle(3003);		
 	hRealSpectra->Draw("hist");
-	hFullSim->Draw("histsame");
+	
 	for(int i = 0; i < used_sources; i++){
 		hSimSource[i]->Draw("histsame");
-	}	
+		SimEscGatedSpectra[i]->Draw("histsame");
+	}
+	hFullSim->Draw("histsame");	
 	hBkgr->Draw("histsame");
 }
 /*
