@@ -6,26 +6,24 @@
 //for absolute efficiency and absolute intensities just use the default value
 void FillSimulation(int source_number, double scale_int = 1.0){
 
-	if( AssignedTransition[source_number].size() == 0 ){
-		cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
-		return;
-	}
-
-	const int Nbins = hBkgr->GetXaxis()->GetNbins();
-	double x_low = hBkgr->GetXaxis()->GetBinLowEdge(1);
-	double x_max = hBkgr->GetXaxis()->GetBinUpEdge(Nbins);
-	hSimPeaks[source_number] = new TH1D(Form("hPeaks_%s", source_name.at(source_number).c_str()),Form("Simulated Source Peaks: %s",  source_name.at(source_number).c_str() ),Nbins, x_low, x_max);
-	double peak_int;
-	double energy;
-	double width;
-	for(int i = 0; i < AssignedTransition[source_number].size(); i++){
-		energy = get<1>(AssignedTransition[source_number].at(i)); 										//get gamma-ray energy
-		peak_int = get<3>(AssignedTransition[source_number].at(i)) * gEff->Eval(energy) * scale_int; 	//calculate peak intensity
-		width = fWidth->Eval(energy); 													//get peak width
-		for(int j = 0; j < peak_int; j++){
-			hSimPeaks[source_number]->Fill( gRandom->Gaus(energy,width) ); 							//fill spectrum using simple gaussian distribution
+		if( gammaList[source_number].size() == 0 ){
+				cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
+				return;
 		}
-	}
+
+		const int Nbins = hBkgr->GetXaxis()->GetNbins();
+		double x_low = hBkgr->GetXaxis()->GetBinLowEdge(1);
+		double x_max = hBkgr->GetXaxis()->GetBinUpEdge(Nbins);
+		hSimPeaks[source_number] = new TH1D(Form("hPeaks_%s", source_name.at(source_number).c_str()),Form("Simulated Source Peaks: %s",  source_name.at(source_number).c_str() ),Nbins, x_low, x_max);
+		double counts;
+		double width;
+		for(auto MyGamma : gammaList[source_number] ){
+				width = fWidth->Eval( MyGamma.gammaEn );
+				counts = MyGamma.gammaInt * gEff->Eval( MyGamma.gammaEn ) * scale_int;
+				for(int j = 0; j < counts; j++){
+						hSimPeaks[source_number]->Fill( gRandom->Gaus(MyGamma.gammaEn,width) );
+				}
+		}
 	hSimPeaks[source_number]->SetLineColor(kRed);
 }
 
@@ -34,24 +32,22 @@ void FillSimulation(int source_number, double scale_int = 1.0){
 //!!!USE SAME SCALING THAT WAS USED BY FillSimulation()
 void FillEscapePeaks(int source_number, double scale_int = 1.0){
 
-	const int Nbins = hBkgr->GetXaxis()->GetNbins();
-	double x_low = hBkgr->GetXaxis()->GetBinLowEdge(1);
-	double x_max = hBkgr->GetXaxis()->GetBinUpEdge(Nbins);
-	hEscPeaks[source_number] = new TH1D(Form("hEscPeaks_%s", source_name.at(source_number).c_str()),Form("Simulated Source Single-Escape Peaks: %s",  source_name.at(source_number).c_str() ),Nbins, x_low, x_max);
-	hEscPeaks[source_number]->SetLineColor(kGreen+2);
+		const int Nbins = hBkgr->GetXaxis()->GetNbins();
+		double x_low = hBkgr->GetXaxis()->GetBinLowEdge(1);
+		double x_max = hBkgr->GetXaxis()->GetBinUpEdge(Nbins);
+		hEscPeaks[source_number] = new TH1D(Form("hEscPeaks_%s", source_name.at(source_number).c_str()),Form("Simulated Source Single-Escape Peaks: %s",  source_name.at(source_number).c_str() ),Nbins, x_low, x_max);
+		hEscPeaks[source_number]->SetLineColor(kGreen+2);
 
-	double peak_int;
-	double energy;
-	double width;
-	for(int i = 0; i < AssignedTransition[source_number].size(); i++){
-		if( get<1>(AssignedTransition[source_number].at(i)) < 1500. ) continue;
-		energy = get<1>(AssignedTransition[source_number].at(i)); 															//get gamma-ray energy
-		peak_int = get<3>(AssignedTransition[source_number].at(i))*gEff->Eval(energy)*fEscPeak->Eval(energy) * scale_int;	//calculate escape-peak intensity
-		width = 1.1*fWidth->Eval(energy);																	//get peak width, S.E.P width is increased by 10 %
-		for(int j = 0; j < peak_int; j++){
-			hEscPeaks[source_number]->Fill( gRandom->Gaus(energy-511.,width) );											//fill spectrum using simple gaussian distribution
+		double width;
+		double counts;
+		for(auto MyGamma : gammaList[source_number] ){
+				if( MyGamma.gammaEn < 1500. ) continue;
+				counts = MyGamma.gammaInt * gEff->Eval( MyGamma.gammaEn ) * fEscPeak->Eval( MyGamma.gammaEn ) * scale_int;
+				width = fWidth->Eval(MyGamma.gammaEn);
+				for(int j = 0; j < counts; j++){
+						hEscPeaks[source_number]->Fill( gRandom->Gaus(MyGamma.gammaEn-511.,width) );
+				}
 		}
-	}
 }
 
 

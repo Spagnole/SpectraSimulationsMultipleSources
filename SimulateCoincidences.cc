@@ -14,64 +14,57 @@ TH2D *sim_gg_mat[NSources];
 TH1D *SimMatProj[NSources];
 TH1D *SimEscMatProj[NSources];
 TH1D *SimEscGatedSpectra[NSources];
-//TH1D *hEscPeaks[NSources];
-//TH1D *hSourceSimSpectrum[NSources];
-//TH1D *hFullSim;
+
 
 
 //this function gets a list of levels from the 'AssignedTransition' vector from the ReadInputData.cc file
 //this function requires that ReadDecayScheme() function has been utilized
 void GetLevelList(int source_number){
 
-	//for(int source_number = 0; source_number < used_sources; source_number++){
-
-		if( AssignedTransition[source_number].size() == 0 ){
-			cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
-			return;
+		if( gammaList[source_number].size() == 0 ){
+				cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
+				return;
 		}
 
 		double prev_energy = -1;
 		int counter = 0;
-		for(int i = 0; i < AssignedTransition[source_number].size(); i++){
-			if( get<0>(AssignedTransition[source_number].at(i)) != prev_energy ){
-				LevelEnergy[source_number].push_back( make_tuple(counter, get<0>(AssignedTransition[source_number].at(i)), 0) );
-				counter++;
-			}
-			prev_energy = get<0>(AssignedTransition[source_number].at(i));
+		
+		for(auto MyGamma : gammaList[source_number] ){
+				if( MyGamma.lvlEn != prev_energy){
+						MyLevels level = {counter, MyGamma.lvlEn, 0};
+						levelList[source_number].push_back( level );
+						counter++;
+						prev_energy = MyGamma.lvlEn;
+				}
 		}
 		
-		for(int i = 0; i < LevelEnergy[source_number].size(); i++){
-			if(PrintLevelList) cout << get<0>(LevelEnergy[source_number].at(i)) << "\t" << get<1>(LevelEnergy[source_number].at(i)) <<endl;
-		}
-	//}
+		if(PrintLevelList) printLevels(source_number);
 }
 
 //this function is used to correct the 'AssignedTransition' list
 //this correction is required if your final level energies do not exactly match the level energies in the 'LevelEnergy' vector
-
 void FixTransitionList(int source_number){
 
-	//for(int source_number = 0; source_number < used_sources; source_number++){
-		if( AssignedTransition[source_number].size() == 0 ){
-			cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
-			return;
+		if( gammaList[source_number].size() == 0 ){
+				cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
+				return;
 		}
 
 		double min_diff;
-		double difference;
-		double new_level_energy;
-		for(int i = 0; i <  AssignedTransition[source_number].size(); i++){
-			min_diff = 10000;
-			for(int j = 0; j < LevelEnergy[source_number].size(); j++){
-				difference = TMath::Abs( get<2>(AssignedTransition[source_number].at(i)) - get<1>(LevelEnergy[source_number].at(j)) );
-				if( difference < min_diff ){
-					new_level_energy = get<1>(LevelEnergy[source_number].at(j));
-					min_diff = difference;
+		double diff;
+		double newLvlEnergy;
+		for(auto &MyGamma : gammaList[source_number]){
+				min_diff = 10000.;
+				for( auto level : levelList[source_number]){
+						diff = TMath::Abs( MyGamma.finalLvl - level.lvlEn);
+						if( diff < min_diff ){
+								newLvlEnergy = level.lvlEn;
+								min_diff = diff;
+						}
 				}
-			}
-			get<2>(AssignedTransition[source_number].at(i)) = new_level_energy;		
+				MyGamma.finalLvl = newLvlEnergy;
 		}
-	//}
+
 }
 
 
@@ -79,160 +72,95 @@ void FixTransitionList(int source_number){
 //this is function is required to properly calculate the expected gamma-gamma coincidence intensity
 void CalcLevelFeedingAndGammaBR(int source_number){
 	
-	//for(int source_number = 0; source_number < used_sources; source_number++){
 		double sum_temp;
-		for(int i = 0; i < LevelEnergy[source_number].size(); i++){
-			sum_temp = 0;
-			for(int j = 0; j <  AssignedTransition[source_number].size(); j++){
-				if(  get<1>(LevelEnergy[source_number].at(i)) == get<0>(AssignedTransition[source_number].at(j))){
-					sum_temp += get<3>(AssignedTransition[source_number].at(j));
+		for( auto &level : levelList[source_number]){
+				sum_temp = 0;
+				for(auto MyGamma : gammaList[source_number]){
+						if( level.lvlEn == MyGamma.lvlEn ) sum_temp += MyGamma.gammaInt;
 				}
-			}
-			get<2>(LevelEnergy[source_number].at(i)) = sum_temp;
+				level.lvlPop = sum_temp;
 		}
 		
 		//calculating gamma-ray branching ratios
-		for(int i = 0; i <  AssignedTransition[source_number].size(); i++){
-			if( i == 0 ) continue;
-			for(int j = 0; j < LevelEnergy[source_number].size(); j++){
-				if(  get<1>(LevelEnergy[source_number].at(j)) == get<0>(AssignedTransition[source_number].at(i))){
-					get<4>(AssignedTransition[source_number].at(i)) = get<2>(LevelEnergy[source_number].at(j));
-					get<5>(AssignedTransition[source_number].at(i)) = get<3>(AssignedTransition[source_number].at(i)) / get<2>(LevelEnergy[source_number].at(j));
+		for(auto &MyGamma : gammaList[source_number]){
+				if( MyGamma.lvlEn == 0) continue; //ground state has no decays so no branching ratio
+				for( auto level : levelList[source_number]){
+						if( level.lvlEn == MyGamma.lvlEn ){
+								MyGamma.lvlPop = level.lvlPop;
+								MyGamma.gammaBr = MyGamma.gammaInt / level.lvlPop;
+						}
 				}
-			}
 		}
 		
 		//calculate level population
-		for(int i = 0; i <  AssignedTransition[source_number].size(); i++){
-			if( i == 0 ) continue;		
-			for(int j = 0; j < AssignedTransition[source_number].size(); j++){
-				if(  get<2>(AssignedTransition[source_number].at(j)) == get<0>(AssignedTransition[source_number].at(i))){
-					get<4>(AssignedTransition[source_number].at(i)) = get<4>(AssignedTransition[source_number].at(i)) - get<3>(AssignedTransition[source_number].at(j));
+		for(auto &MyGamma : gammaList[source_number]){
+				if( MyGamma.lvlEn == 0) continue; //ground state has no decays so no branching ratio
+				for(auto otherGamma : gammaList[source_number]){
+						if( otherGamma.finalLvl == MyGamma.lvlEn )
+								MyGamma.lvlPop -= otherGamma.gammaInt;
+								if( MyGamma.lvlPop < 0 ) MyGamma.lvlPop = 0;
 				}
-			}
 		}
+}
+
+//ofstream outfile("nested-output.dat");
+void AddToCoincidenceList(int source_number, vector<MyTransition> feederList, MyTransition Decay, double intensity ){
 		
-		//calculating gamma-ray branching ratios
-		for(int i = AssignedTransition[source_number].size()-1; i >= 0; i--){
-			if(PrintCalcBR) cout << get<0>(AssignedTransition[source_number].at(i)) << "\t" << get<1>(AssignedTransition[source_number].at(i)) << "\t" << get<2>(AssignedTransition[source_number].at(i)) << "\t";
-			if(PrintCalcBR) cout << get<3>(AssignedTransition[source_number].at(i)) << "\t" << get<4>(AssignedTransition[source_number].at(i)) << "\t" << get<5>(AssignedTransition[source_number].at(i)) << endl;
+		gammagamma gg;
+		for( auto Feeder : feederList){
+				gg =  {Decay.gammaEn, Feeder.gammaEn, intensity};
+				//outfile << Decay.gammaEn << "\t" << Feeder.gammaEn << "\t" << intensity <<endl;
+				coincList[source_number].push_back(gg);
 		}
-	//}
 }
 
-
-void AddToCoincidenceList(int source_number, vector<int> feeder_index, int decay_index, double intensity ){
-
-	double decay_energy = get<1>(AssignedTransition[source_number].at(decay_index));
-	for(int i = 0; i < feeder_index.size(); i++){
-		double feeder_energy = get<1>(AssignedTransition[source_number].at( feeder_index.at(i) ) );	
-		gg_coinc[source_number].push_back( make_tuple(feeder_energy,decay_energy, intensity) );
-	}
-}
-
-void PrintUnfinishedCascade(int source_number, vector<int> list){
-
-	cout  << "WARNING!!! Cascade not finished"<<endl;	
-	for(int x = 0; x < list.size(); x++){
-		int y = list.at(x);
-		for(int z = 0; z < x; z++) cout <<"\t";
-		cout << get<0>(AssignedTransition[source_number].at(y)) << " --> " << 
-		get<1>(AssignedTransition[source_number].at(y)) << " --> " << get<2>(AssignedTransition[source_number].at(y)) << endl;
-	}
-	cout << "User can add nested loops for FindCoincidences() function!\n";
-}
-
-//this function calculates the expected number of gamma-gamma coincidences
-//this function uses a large number of nested loops (Should be replaced by some recursive loop?)
-//if a gamma-gamma coincidence is separated by about 5 intermediate gamma-rays it will not be added to the list of coincidences
-//if you require such coincidences ---> Add more nested loops
-void FindCoincidences(int source_number){
+void FindCoincidenceRec(int source_number, vector<MyTransition> &feederList, MyTransition currentTransition, double currentIntensity, int index) {
+		// Loop through previous transitions starting from the current index - 1
+		if( currentTransition.finalLvl == 0 ) return;
 		
-	if( AssignedTransition[source_number].size() == 0 ){
-		cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
-		return;
-	}
+		for (int i = index - 1; i >= 0; --i) {
+				MyTransition nextTransition = gammaList[source_number].at(i);
 
-	double NDecays, Ngg[10];
-	
-	gg_coinc[source_number].clear();
-	
-	for(int i = AssignedTransition[source_number].size()-1; i >= 0 ; i--){
-		if( get<2>(AssignedTransition[source_number].at(i))  == 0 ) continue;
-		NDecays = get<4>(AssignedTransition[source_number].at(i))*get<5>(AssignedTransition[source_number].at(i));
-		for(int j = i-1; j >= 0 ; j--){
-			if( get<2>(AssignedTransition[source_number].at(i)) == get<0>(AssignedTransition[source_number].at(j))){
-				Ngg[0] = NDecays*get<5>(AssignedTransition[source_number].at(j));
-				AddToCoincidenceList(source_number,{i},j, Ngg[0] );
-				if( get<2>(AssignedTransition[source_number].at(j))  == 0 ) continue;
-				for(int k = j-1; k >= 0 ; k--){
-					if( get<2>(AssignedTransition[source_number].at(j)) == get<0>(AssignedTransition[source_number].at(k))){
-						Ngg[1] = Ngg[0]*get<5>(AssignedTransition[source_number].at(k));
-						AddToCoincidenceList(source_number,{i,j},k, Ngg[1] );
-						if( get<2>(AssignedTransition[source_number].at(k))  == 0 ) continue;
-						for(int l = k-1; l >= 0 ; l--){
-							if( get<2>(AssignedTransition[source_number].at(k)) == get<0>(AssignedTransition[source_number].at(l))){
-								Ngg[2] = Ngg[1]*get<5>(AssignedTransition[source_number].at(l));
-								AddToCoincidenceList(source_number,{i,j,k},l, Ngg[2] );
-								if( get<2>(AssignedTransition[source_number].at(l))  == 0 ) continue;
-								for(int m = l-1; m >= 0 ; m--){
-									if( get<2>(AssignedTransition[source_number].at(l)) == get<0>(AssignedTransition[source_number].at(m))){
-										Ngg[3] = Ngg[2]*get<5>(AssignedTransition[source_number].at(m));
-										AddToCoincidenceList(source_number,{i,j,k,l},m, Ngg[3] );
-										if( get<2>(AssignedTransition[source_number].at(m))  == 0 ) continue;
-										for(int n = m-1; n >= 0 ; n--){
-											if( get<2>(AssignedTransition[source_number].at(m)) == get<0>(AssignedTransition[source_number].at(n))){
-												Ngg[4] = Ngg[3]*get<5>(AssignedTransition[source_number].at(n));
-												AddToCoincidenceList(source_number,{i,j,k,l,m},n, Ngg[4] );
-												if( get<2>(AssignedTransition[source_number].at(n))  == 0 ) continue;
-												for(int p = n-1; p >= 0 ; p--){
-													if( get<2>(AssignedTransition[source_number].at(n)) == get<0>(AssignedTransition[source_number].at(p))){
-														Ngg[5] = Ngg[4]*get<5>(AssignedTransition[source_number].at(p));
-														AddToCoincidenceList(source_number,{i,j,k,l,m,n},p, Ngg[5] );
-														if( get<2>(AssignedTransition[source_number].at(p)) !=0) PrintUnfinishedCascade(source_number,{i,j,k,l,m,n});
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
+				// If the final level of the current transition matches the energy level of the next transition
+				if (currentTransition.finalLvl == nextTransition.lvlEn) {
+						double nextIntensity = currentIntensity * nextTransition.gammaBr;
+						// Recursive call: Add the current transition to the feeder list and continue
+						feederList.push_back(currentTransition);
+						// Add to coincidence list
+						AddToCoincidenceList(source_number, feederList, nextTransition, nextIntensity);
+
+
+						FindCoincidenceRec(source_number, feederList, nextTransition, nextIntensity, i);
+						feederList.pop_back(); // Backtrack
 				}
-			}
 		}
-	}
 }
 
 
-//this function is used to reduce the size of the gamma-gamma coincidence list
-//if a given coincidence is given a number of times, this function will reduce the entries of that coincidence to one instance but adds all of the intensities
-//strictly speaking this function is not absolutely required for the tool to function! BUT YOU SHOULD STILL USE IT!
-void ReduceGammaGammaList(int source_number){
-	
-	for(int i = 0; i < gg_coinc[source_number].size();i++){
-		for(int j = 0; j < gg_coinc[source_number].size(); j++){
-			if(i==j) continue;
-			if( get<0>(gg_coinc[source_number].at(i)) == get<0>(gg_coinc[source_number].at(j)) && get<1>(gg_coinc[source_number].at(i)) == get<1>(gg_coinc[source_number].at(j)) ){
-				if( PrintReducedCoincList ) cout << get<0>(gg_coinc[source_number].at(i)) << "\t" << get<1>(gg_coinc[source_number].at(i)) << "\t"  << get<2>(gg_coinc[source_number].at(i)) <<endl;
-				if( PrintReducedCoincList ) cout <<"\t" << get<0>(gg_coinc[source_number].at(j)) << "\t" << get<1>(gg_coinc[source_number].at(j)) << "\t"  << get<2>(gg_coinc[source_number].at(j)) <<endl;
-				get<2>(gg_coinc[source_number].at(i)) =  get<2>(gg_coinc[source_number].at(i)) + get<2>(gg_coinc[source_number].at(j));
-				if( PrintReducedCoincList ) cout << "\t\t" << get<0>(gg_coinc[source_number].at(i)) << "\t" << get<1>(gg_coinc[source_number].at(i)) << "\t"  << get<2>(gg_coinc[source_number].at(i)) <<endl;
-				gg_coinc[source_number].erase(gg_coinc[source_number].begin()+j);
-				j=j-1;
-			}
+void FindCoincidences(int source_number) {
+		if (gammaList[source_number].size() == 0) {
+				cout << "No data in decay list!\nHave you read in the list of gamma-rays?" << endl;
+				return;
 		}
-	}
+
+		coincList[source_number].clear();  // Clear the coincidence list for this source
+
+		// Iterate through each transition as the starting point
+		for (int g0 = gammaList[source_number].size() - 1; g0 >= 0; --g0) {
+				MyTransition firstTransition = gammaList[source_number].at(g0);
+				if (firstTransition.finalLvl == 0) continue;  // Skip transitions ending at level 0
+
+				double NDecays = firstTransition.lvlPop * firstTransition.gammaBr;
+
+				// Initialize an empty feeder list
+				vector<MyTransition> feederList;
+				
+				// Start recursive search with current transition as the initial feeder
+				FindCoincidenceRec(source_number, feederList, firstTransition, NDecays, g0);
+		}
 }
 
-void PrintCoincidences(int source_number, string filename){
-	
-	ofstream outfile( filename.c_str() );
-	for(int i = 0; i < gg_coinc[source_number].size();i++){
-		outfile << get<0>(gg_coinc[source_number].at(i)) << "\t" << get<1>(gg_coinc[source_number].at(i)) << "\t"  << get<2>(gg_coinc[source_number].at(i)) <<endl;
-	}
-}
+
 
 //this function fills a simulated gamma-gamma coincidence matrix
 //user can provide specified binning of the matrix
@@ -251,17 +179,15 @@ void FillCoincMatrix(int source_number, int NBins = -1, double low = -1, double 
 	sim_gg_mat[source_number] = new TH2D(Form("sim_gg_mat_%s", source_name.at(source_number).c_str() ), Form("Simulated g-g matrix Source: %s",source_name.at(source_number).c_str() ),NBins,low,upp,NBins,low,upp);
 	double gamma1,gamma2,sigma1,sigma2;
 	double counts;
-	for(int i = 0; i < gg_coinc[source_number].size(); i++){
-		gamma1 = get<0>(gg_coinc[source_number].at(i));
-		gamma2 = get<1>(gg_coinc[source_number].at(i));
-		counts = (14./15) * get<2>(gg_coinc[source_number].at(i)) * gEff->Eval(gamma1) * gEff->Eval(gamma2); //user may require different normalisation if using relative efficiency curve
-		sigma1 = fWidth->Eval(gamma1);
-		sigma2 = fWidth->Eval(gamma2);
-		for(int j = 0; j < counts; j++){
-			sim_gg_mat[source_number]->Fill( gRandom->Gaus(gamma1,sigma1), gRandom->Gaus(gamma2,sigma2));
-			sim_gg_mat[source_number]->Fill( gRandom->Gaus(gamma2,sigma2), gRandom->Gaus(gamma1,sigma1));
+		for(auto gg : coincList[source_number]){
+				counts = (14./15) * gg.coincidences * gEff->Eval(gg.gammaOne) * gEff->Eval(gg.gammaTwo);
+				sigma1 = fWidth->Eval(gg.gammaOne);
+				sigma2 = fWidth->Eval(gg.gammaTwo);
+				for(int j = 0; j < counts; j++){
+					sim_gg_mat[source_number]->Fill( gRandom->Gaus(gg.gammaOne,sigma1), gRandom->Gaus(gg.gammaTwo,sigma2));
+					sim_gg_mat[source_number]->Fill( gRandom->Gaus(gg.gammaTwo,sigma2), gRandom->Gaus(gg.gammaOne,sigma1));
+				}
 		}
-	}
 	
 }
 
@@ -352,53 +278,90 @@ void BuildSimuledSpectra(){
 	
 	for(int i = 0; i < used_sources; i++){
 		hSimSource[i]->Draw("histsame");
-		SimEscGatedSpectra[i]->Draw("histsame");
+			if( SimEscGatedSpectra[i] != NULL) SimEscGatedSpectra[i]->Draw("histsame");
 	}
 	hFullSim->Draw("histsame");	
 	hBkgr->Draw("histsame");
 }
-/*
-//this function is identical to the function used by SimulateSingles.cc (Perhaps it should be put in the ReadInputData.cc file?)
-//this function is used to produce the full simulated spectrum
-//this function reads in the simulated Full energy peaks, single escape peaks and the background extracted from the real spectrum
-//this function creates three new spectra
-//One adds the full-energy peaks, single esc, peaks and the background, this is the full simulated spectrum
-//Another adds the full energy peaks to the background
-//The third adds the escape peaks to the background
-void BuildSimuledSpectra(TH1D *hSimPeaks, TH1D *hBkgr, TH1D *hEscPeaks){
-
-	const int Nbins = hBkgr->GetXaxis()->GetNbins();
-	double x_low = hBkgr->GetXaxis()->GetBinLowEdge(1);
-	double x_max = hBkgr->GetXaxis()->GetBinUpEdge(Nbins);
-	hFullSim = new TH1D("hFullSim","Full Sim Spectrum",Nbins, x_low, x_max);
-	hSimPeaks_Bkgr = new TH1D("hSimPeaks_Bkgr","Sim Peaks on Bkgr",Nbins, x_low, x_max);
-	hEscPeaks_Bkgr = new TH1D("hEscPeaks_Bkgr","Sim Esc, Peaks on Bkgr",Nbins, x_low, x_max);
 
 
-	hFullSim->SetLineColor(kRed);
-	hFullSim->Add(hBkgr);
-	hFullSim->Add(hSimPeaks);
-	hFullSim->Add(hEscPeaks);
+//this function is used to reduce the size of the gamma-gamma coincidence list
+//if a given coincidence is given a number of times, this function will reduce the entries of that coincidence to one instance but adds all of the intensities
+//strictly speaking this function is not absolutely required for the tool to function! BUT YOU SHOULD STILL USE IT!
+/*void ReduceGammaGammaList(int source_number){
+	
+	for(int i = 0; i < gg_coinc[source_number].size();i++){
+		for(int j = 0; j < gg_coinc[source_number].size(); j++){
+			if(i==j) continue;
+			if( get<0>(gg_coinc[source_number].at(i)) == get<0>(gg_coinc[source_number].at(j)) && get<1>(gg_coinc[source_number].at(i)) == get<1>(gg_coinc[source_number].at(j)) ){
+				if( PrintReducedCoincList ) cout << get<0>(gg_coinc[source_number].at(i)) << "\t" << get<1>(gg_coinc[source_number].at(i)) << "\t"  << get<2>(gg_coinc[source_number].at(i)) <<endl;
+				if( PrintReducedCoincList ) cout <<"\t" << get<0>(gg_coinc[source_number].at(j)) << "\t" << get<1>(gg_coinc[source_number].at(j)) << "\t"  << get<2>(gg_coinc[source_number].at(j)) <<endl;
+				get<2>(gg_coinc[source_number].at(i)) =  get<2>(gg_coinc[source_number].at(i)) + get<2>(gg_coinc[source_number].at(j));
+				if( PrintReducedCoincList ) cout << "\t\t" << get<0>(gg_coinc[source_number].at(i)) << "\t" << get<1>(gg_coinc[source_number].at(i)) << "\t"  << get<2>(gg_coinc[source_number].at(i)) <<endl;
+				gg_coinc[source_number].erase(gg_coinc[source_number].begin()+j);
+				j=j-1;
+			}
+		}
+	}
+}*/
 
-	hSimPeaks_Bkgr->SetLineColor(kGreen+2);
-	hSimPeaks_Bkgr->Add(hBkgr);
-	hSimPeaks_Bkgr->Add(hSimPeaks);
+//this function calculates the expected number of gamma-gamma coincidences
+//this function uses a large number of nested loops (Should be replaced by some recursive loop?)
+//if a gamma-gamma coincidence is separated by about 5 intermediate gamma-rays it will not be added to the list of coincidences
+//if you require such coincidences ---> Add more nested loops
+/*void FindCoincidences(int source_number){
 		
-	hEscPeaks_Bkgr->SetLineColor(6);
-	hEscPeaks_Bkgr->Add(hBkgr);
-	hEscPeaks_Bkgr->Add(hEscPeaks);
+		if( gammaList[source_number].size() == 0 ){
+			cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
+			return;
+		}
 
-	hRealSpectra->SetFillColor(kBlue);
-	hRealSpectra->SetFillStyle(3003);
+		double Ngg[10];
+		coincList[source_number].clear();
 		
-	hRealSpectra->Draw("hist");
-	hSimPeaks_Bkgr->Draw("histsame");
-	hEscPeaks_Bkgr->Draw("histsame");		
-	hFullSim->Draw("histsame");
-	hBkgr->Draw("histsame");
-}
-
-*/
-
-
-
+		for(int g0 = gammaList[source_number].size()-1; g0 >= 0 ; g0--){
+				auto First = gammaList[source_number].at(g0);
+				if( First.finalLvl == 0 ) continue;
+				Ngg[0] = First.lvlPop * First.gammaBr;
+				for(int g1 = g0-1; g1 >= 0; g1--){
+						auto Second = gammaList[source_number].at(g1);
+						if( First.finalLvl == Second.lvlEn ){
+								Ngg[1] = Ngg[0] * Second.gammaBr;
+								AddToCoincidenceList(source_number,{First},Second, Ngg[1] );
+								if( Second.finalLvl == 0 ) continue;
+								for(int g2 = g1-1; g2 >= 0; g2--){
+										auto Third = gammaList[source_number].at(g2);
+										if( Second.finalLvl == Third.lvlEn  ){
+												Ngg[2] = Ngg[1] * Third.gammaBr;
+												AddToCoincidenceList(source_number,{First,Second},Third, Ngg[2] );
+												if( Third.finalLvl == 0 ) continue;
+												for(int g3 = g2-1; g3 >= 0;g3--){
+														auto Fourth = gammaList[source_number].at(g3);
+														if( Third.finalLvl == Fourth.lvlEn ){
+																Ngg[3] = Ngg[2] * Fourth.gammaBr;
+																AddToCoincidenceList(source_number,{First,Second,Third},Fourth, Ngg[3] );
+																if( Fourth.finalLvl == 0 ) continue;
+																for(int g4 = g3 - 1; g4 >= 0; g4--){
+																		auto Fifth = gammaList[source_number].at(g4);
+																		if( Fourth.finalLvl == Fifth.lvlEn ){
+																				Ngg[4] = Ngg[3] * Fifth.gammaBr;
+																				AddToCoincidenceList(source_number,{First,Second,Third,Fourth},Fifth, Ngg[4] );
+																				if( Fifth.finalLvl == 0 ) continue;
+																				for(int g5 = g4-1; g5 >= 0; g5--){
+																						auto Sixth = gammaList[source_number].at(g5);
+																						if( Fifth.finalLvl == Sixth.lvlEn ){
+																								Ngg[5] = Ngg[4] * Sixth.gammaBr;
+																								AddToCoincidenceList(source_number,{First,Second,Third,Fourth,Fifth},Sixth, Ngg[5] );
+																						} //end of g5 mapping
+																				}//end of g5 loop
+																		}//end of g4 mapping
+																}//end of g4 loop
+														}//end of g3 mapping
+												}//end of g3 loop
+										}//end of g2 map
+								} //end of  g2 loop
+						} //end of g1 match
+				} //end of g1 loop
+		}//end for g0 loop
+		
+}*/
