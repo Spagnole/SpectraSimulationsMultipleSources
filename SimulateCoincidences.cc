@@ -1,107 +1,11 @@
 #include "ReadInputData.cc"
-
-bool PrintReducedCoincList = false;
-
-//this vector is a list of levels, this vector is populated by the GetLevelList() function.
-//The components of this vector are: Level Index ---> Level Energy ---> Level Population
-vector<tuple<int, double, double>> LevelEnergy[NSources];
-
-//list of gamma-gamma coincidence intensities
-//The components of this vector are: Gamma 1 ---> Gamma 2 ---> Intensity of coincidence
-vector<tuple<double,double,double>> gg_coinc[NSources]; 
+#include "WriteData.cc"
+#include "BuildLevelScheme.cc"
 
 TH2D *sim_gg_mat[NSources];
 TH1D *SimMatProj[NSources];
 TH1D *SimEscMatProj[NSources];
 TH1D *SimEscGatedSpectra[NSources];
-
-
-
-//this function gets a list of levels from the 'AssignedTransition' vector from the ReadInputData.cc file
-//this function requires that ReadDecayScheme() function has been utilized
-void GetLevelList(int source_number){
-
-		if( gammaList[source_number].size() == 0 ){
-				cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
-				return;
-		}
-
-		double prev_energy = -1;
-		int counter = 0;
-		
-		for(auto MyGamma : gammaList[source_number] ){
-				if( MyGamma.lvlEn != prev_energy){
-						MyLevels level = {counter, MyGamma.lvlEn, 0};
-						levelList[source_number].push_back( level );
-						counter++;
-						prev_energy = MyGamma.lvlEn;
-				}
-		}
-		
-		if(PrintLevelList) printLevels(source_number);
-}
-
-//this function is used to correct the 'AssignedTransition' list
-//this correction is required if your final level energies do not exactly match the level energies in the 'LevelEnergy' vector
-void FixTransitionList(int source_number){
-
-		if( gammaList[source_number].size() == 0 ){
-				cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
-				return;
-		}
-
-		double min_diff;
-		double diff;
-		double newLvlEnergy;
-		for(auto &MyGamma : gammaList[source_number]){
-				min_diff = 10000.;
-				for( auto level : levelList[source_number]){
-						diff = TMath::Abs( MyGamma.finalLvl - level.lvlEn);
-						if( diff < min_diff ){
-								newLvlEnergy = level.lvlEn;
-								min_diff = diff;
-						}
-				}
-				MyGamma.finalLvl = newLvlEnergy;
-		}
-
-}
-
-
-//this function calculates the level population of each state and the gamma-ray branching ratio of each transition
-//this is function is required to properly calculate the expected gamma-gamma coincidence intensity
-void CalcLevelFeedingAndGammaBR(int source_number){
-	
-		double sum_temp;
-		for( auto &level : levelList[source_number]){
-				sum_temp = 0;
-				for(auto MyGamma : gammaList[source_number]){
-						if( level.lvlEn == MyGamma.lvlEn ) sum_temp += MyGamma.gammaInt;
-				}
-				level.lvlPop = sum_temp;
-		}
-		
-		//calculating gamma-ray branching ratios
-		for(auto &MyGamma : gammaList[source_number]){
-				if( MyGamma.lvlEn == 0) continue; //ground state has no decays so no branching ratio
-				for( auto level : levelList[source_number]){
-						if( level.lvlEn == MyGamma.lvlEn ){
-								MyGamma.lvlPop = level.lvlPop;
-								MyGamma.gammaBr = MyGamma.gammaInt / level.lvlPop;
-						}
-				}
-		}
-		
-		//calculate level population
-		for(auto &MyGamma : gammaList[source_number]){
-				if( MyGamma.lvlEn == 0) continue; //ground state has no decays so no branching ratio
-				for(auto otherGamma : gammaList[source_number]){
-						if( otherGamma.finalLvl == MyGamma.lvlEn )
-								MyGamma.lvlPop -= otherGamma.gammaInt;
-								if( MyGamma.lvlPop < 0 ) MyGamma.lvlPop = 0;
-				}
-		}
-}
 
 //ofstream outfile("nested-output.dat");
 void AddToCoincidenceList(int source_number, vector<MyTransition> feederList, MyTransition Decay, double intensity ){
@@ -120,7 +24,6 @@ void FindCoincidenceRec(int source_number, vector<MyTransition> &feederList, MyT
 		
 		for (int i = index - 1; i >= 0; --i) {
 				MyTransition nextTransition = gammaList[source_number].at(i);
-
 				// If the final level of the current transition matches the energy level of the next transition
 				if (currentTransition.finalLvl == nextTransition.lvlEn) {
 						double nextIntensity = currentIntensity * nextTransition.gammaBr;
@@ -128,8 +31,6 @@ void FindCoincidenceRec(int source_number, vector<MyTransition> &feederList, MyT
 						feederList.push_back(currentTransition);
 						// Add to coincidence list
 						AddToCoincidenceList(source_number, feederList, nextTransition, nextIntensity);
-
-
 						FindCoincidenceRec(source_number, feederList, nextTransition, nextIntensity, i);
 						feederList.pop_back(); // Backtrack
 				}
@@ -142,25 +43,18 @@ void FindCoincidences(int source_number) {
 				cout << "No data in decay list!\nHave you read in the list of gamma-rays?" << endl;
 				return;
 		}
-
 		coincList[source_number].clear();  // Clear the coincidence list for this source
-
 		// Iterate through each transition as the starting point
 		for (int g0 = gammaList[source_number].size() - 1; g0 >= 0; --g0) {
 				MyTransition firstTransition = gammaList[source_number].at(g0);
 				if (firstTransition.finalLvl == 0) continue;  // Skip transitions ending at level 0
-
 				double NDecays = firstTransition.lvlPop * firstTransition.gammaBr;
-
 				// Initialize an empty feeder list
 				vector<MyTransition> feederList;
-				
 				// Start recursive search with current transition as the initial feeder
 				FindCoincidenceRec(source_number, feederList, firstTransition, NDecays, g0);
 		}
 }
-
-
 
 //this function fills a simulated gamma-gamma coincidence matrix
 //user can provide specified binning of the matrix
@@ -180,7 +74,7 @@ void FillCoincMatrix(int source_number, int NBins = -1, double low = -1, double 
 	double gamma1,gamma2,sigma1,sigma2;
 	double counts;
 		for(auto gg : coincList[source_number]){
-				counts = (14./15) * gg.coincidences * gEff->Eval(gg.gammaOne) * gEff->Eval(gg.gammaTwo);
+				counts = ( (NDet-1) /NDet) * gg.coincidences * gEff->Eval(gg.gammaOne) * gEff->Eval(gg.gammaTwo);
 				sigma1 = fWidth->Eval(gg.gammaOne);
 				sigma2 = fWidth->Eval(gg.gammaTwo);
 				for(int j = 0; j < counts; j++){
@@ -250,8 +144,6 @@ void BuildSimuledSpectra(){
 	hFullSim->SetLineColor(kRed);
 	hFullSim->Add(hBkgr);
 	
-
-	
 	int hist_colors[] = {6, 417, 1, 900-4, 432, 801, 880, 861, 625, 416};
 	for(int i = 0; i < used_sources; i++){
 		cout << i << endl;
@@ -271,7 +163,6 @@ void BuildSimuledSpectra(){
 		hFullSim->Add(hEscPeaks[i]);
 	}
 	
-
 	hRealSpectra->SetFillColor(kBlue);
 	hRealSpectra->SetFillStyle(3003);		
 	hRealSpectra->Draw("hist");
@@ -284,26 +175,19 @@ void BuildSimuledSpectra(){
 	hBkgr->Draw("histsame");
 }
 
-
-//this function is used to reduce the size of the gamma-gamma coincidence list
-//if a given coincidence is given a number of times, this function will reduce the entries of that coincidence to one instance but adds all of the intensities
-//strictly speaking this function is not absolutely required for the tool to function! BUT YOU SHOULD STILL USE IT!
-/*void ReduceGammaGammaList(int source_number){
-	
-	for(int i = 0; i < gg_coinc[source_number].size();i++){
-		for(int j = 0; j < gg_coinc[source_number].size(); j++){
-			if(i==j) continue;
-			if( get<0>(gg_coinc[source_number].at(i)) == get<0>(gg_coinc[source_number].at(j)) && get<1>(gg_coinc[source_number].at(i)) == get<1>(gg_coinc[source_number].at(j)) ){
-				if( PrintReducedCoincList ) cout << get<0>(gg_coinc[source_number].at(i)) << "\t" << get<1>(gg_coinc[source_number].at(i)) << "\t"  << get<2>(gg_coinc[source_number].at(i)) <<endl;
-				if( PrintReducedCoincList ) cout <<"\t" << get<0>(gg_coinc[source_number].at(j)) << "\t" << get<1>(gg_coinc[source_number].at(j)) << "\t"  << get<2>(gg_coinc[source_number].at(j)) <<endl;
-				get<2>(gg_coinc[source_number].at(i)) =  get<2>(gg_coinc[source_number].at(i)) + get<2>(gg_coinc[source_number].at(j));
-				if( PrintReducedCoincList ) cout << "\t\t" << get<0>(gg_coinc[source_number].at(i)) << "\t" << get<1>(gg_coinc[source_number].at(i)) << "\t"  << get<2>(gg_coinc[source_number].at(i)) <<endl;
-				gg_coinc[source_number].erase(gg_coinc[source_number].begin()+j);
-				j=j-1;
-			}
+void WriteSimulation(string filename){
+		
+		TFile *fNew = TFile::Open(filename.c_str(), "RECREATE");
+		hRealSpectra->Write();
+		hFullSim->Write();
+		hBkgr->Write();
+		for(int i = 0; i < used_sources; i++){
+			hSimSource[i]->Write();
+				if( SimEscGatedSpectra[i] != NULL)
+						SimEscGatedSpectra[i]->Write();
 		}
-	}
-}*/
+}
+
 
 //this function calculates the expected number of gamma-gamma coincidences
 //this function uses a large number of nested loops (Should be replaced by some recursive loop?)
@@ -365,3 +249,92 @@ void BuildSimuledSpectra(){
 		}//end for g0 loop
 		
 }*/
+
+
+
+
+/*
+//this function gets a list of levels from the 'AssignedTransition' vector from the ReadInputData.cc file
+//this function requires that ReadDecayScheme() function has been utilized
+void GetLevelList(int source_number){
+
+		if( gammaList[source_number].size() == 0 ){
+				cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
+				return;
+		}
+
+		double prev_energy = -1;
+		int counter = 0;
+		
+		for(auto MyGamma : gammaList[source_number] ){
+				if( MyGamma.lvlEn != prev_energy){
+						MyLevels level = {counter, MyGamma.lvlEn, 0};
+						levelList[source_number].push_back( level );
+						counter++;
+						prev_energy = MyGamma.lvlEn;
+				}
+		}
+}
+
+//this function is used to correct the 'AssignedTransition' list
+//this correction is required if your final level energies do not exactly match the level energies in the 'LevelEnergy' vector
+void FixTransitionList(int source_number){
+
+		if( gammaList[source_number].size() == 0 ){
+				cout << "No data in decay list!\nHave you read in list of gamma-rays?" << endl;
+				return;
+		}
+
+		double min_diff;
+		double diff;
+		double newLvlEnergy;
+		for(auto &MyGamma : gammaList[source_number]){
+				min_diff = 10000.;
+				for( auto level : levelList[source_number]){
+						diff = TMath::Abs( MyGamma.finalLvl - level.lvlEn);
+						if( diff < min_diff ){
+								newLvlEnergy = level.lvlEn;
+								min_diff = diff;
+						}
+				}
+				MyGamma.finalLvl = newLvlEnergy;
+		}
+
+}
+
+
+//this function calculates the level population of each state and the gamma-ray branching ratio of each transition
+//this is function is required to properly calculate the expected gamma-gamma coincidence intensity
+void CalcLevelFeedingAndGammaBR(int source_number){
+	
+		double sum_temp;
+		for( auto &level : levelList[source_number]){
+				sum_temp = 0;
+				for(auto MyGamma : gammaList[source_number]){
+						if( level.lvlEn == MyGamma.lvlEn ) sum_temp += MyGamma.gammaInt;
+				}
+				level.lvlPop = sum_temp;
+		}
+		
+		//calculating gamma-ray branching ratios
+		for(auto &MyGamma : gammaList[source_number]){
+				if( MyGamma.lvlEn == 0) continue; //ground state has no decays so no branching ratio
+				for( auto level : levelList[source_number]){
+						if( level.lvlEn == MyGamma.lvlEn ){
+								MyGamma.lvlPop = level.lvlPop;
+								MyGamma.gammaBr = MyGamma.gammaInt / level.lvlPop;
+						}
+				}
+		}
+		
+		//calculate level population
+		for(auto &MyGamma : gammaList[source_number]){
+				if( MyGamma.lvlEn == 0) continue; //ground state has no decays so no branching ratio
+				for(auto otherGamma : gammaList[source_number]){
+						if( otherGamma.finalLvl == MyGamma.lvlEn )
+								MyGamma.lvlPop -= otherGamma.gammaInt;
+								if( MyGamma.lvlPop < 0 ) MyGamma.lvlPop = 0;
+				}
+		}
+}
+*/

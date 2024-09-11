@@ -1,6 +1,7 @@
 #include "ReadInputData.hh"
 
 
+
 //////////////////////////////////////////////////////////////
 ///// PLEASE NOT ALL ENERGIES SHOULD BE GIVEN IN keV!!! //////
 //////////////////////////////////////////////////////////////
@@ -56,9 +57,10 @@ void ReadDecayScheme(string filename = "example-152Eu/152Gd.dat", string enter_s
 }
 
 
-
-		
-
+double NDet=15;
+void SetNumDetectors(double x){
+		NDet=x;
+}
 
 //The GetEfficiency() function is used to read in your gamma-ray efficiency and add produce a graph of efficiency as a function of energy
 //this function reads in a two column text file
@@ -244,93 +246,3 @@ void GetRealSpectra(string rootfilename = "ExampleFile.root", string RealHistNam
        Background(Double_t* spectrum, Int_t ssize, Int_t numberIterations, Int_t direction, Int_t filterOrder, bool smoothing, Int_t smoothWindow, bool compton)
 */
 
-void printGammaList(int SourceNum = 0){
-		for(auto MyGamma : gammaList[SourceNum] ) MyGamma.Display();
-}
-
-void printLevels(int source_number = 0){
-		for(auto level : levelList[source_number]) level.Display();
-}
-void printLevelsReverse(int source_number = 0){
-		for(auto level = levelList[source_number].rbegin(); level != levelList[source_number].rend(); level++)
-				level->Display();
-}
-
-void printCoincidences(int source_number){
-		for(auto gg : coincList[source_number]) gg.Display();
-}
-
-/*
-void OldReadDecayScheme(string filename = "example-152Eu/152Gd.dat", string enter_source_name = Form("source_%d",used_sources)){
-		ifstream input( filename.c_str() );
-		if( !input.is_open() ){
-				cout << filename << " is not open!" << endl;
-				return;
-		}
-		double a[5];
-		MyTransition MyGamma;
-		input >> a[0] >> a[1] >> a[2] >> a[3] >> a[4];
-		while( !input.eof() ){
-				MyGamma.lvlEn = a[0];
-				MyGamma.gammaEn = a[1];
-				MyGamma.finalLvl = a[2];
-				MyGamma.gammaInt = a[3];
-				MyGamma.gammaIntError = a[4];
-				MyGamma.lvlPop = 0;
-				MyGamma.gammaBr = 0;
-				gammaList[used_sources].push_back(MyGamma);
-				if(PrintReadData) cout << a[0] << "\t" <<  a[1] << "\t" <<
-						a[2] << "\t" <<  a[3] << "\t" <<  a[4] << endl;
-				input >> a[0] >> a[1] >> a[2] >> a[3] >> a[4];
-		}
-		used_sources++;
-		source_name.push_back(enter_source_name);
-}
-*/
-/*
-void OldGetEfficiency(string eff_filename = "MyExpEffnew.dat"){
-		ifstream myfitresult( eff_filename.c_str() );
-		if( !myfitresult.is_open() ){
-				cout << eff_filename << " is not open!" << endl;
-				return;
-		}
-		gEff = new TGraph();
-		double a[2];
-		myfitresult >> a[0] >> a[1];
-		while( !myfitresult.eof() ){
-				gEff->SetPoint( gEff->GetN(), a[0], a[1]);
-				myfitresult >> a[0] >> a[1];
-		}
-}
-*/
-/*
-void OldGetPeakWidth(string peak_widths_filename = "PeakWidths.dat"){
-
-	gSigma = new TGraphErrors();
-	gSigma->SetName("gSigma");
-	gSigma->SetMarkerStyle(20);
-	gSigma->SetMarkerColor(kBlue);
-	
-	ifstream input( peak_widths_filename.c_str() );
-	if( !input.is_open() ){
-		cout << peak_widths_filename << " is not open!" << endl;
-		return;
-	}
-	double a[4];
-	input >> a[0] >> a[1] >> a[2] >> a[3];
-	while( !input.eof() ){
-		if( a[2] > a[3] ){
-			gSigma->SetPoint( gSigma->GetN(), a[0], a[2]);
-			gSigma->SetPointError( gSigma->GetN()-1,  a[1], a[3]);
-			if(PrintPeakWidths) cout << a[0] << "\t" << a[1] << "\t" << a[2] << "\t" << a[3] << endl;
-		}
-			input >> a[0] >> a[1] >> a[2] >> a[3];
-		
-	}
-	fWidth = new TF1("fWidth","[0]+[1]*x",0,8000);
-	fWidth->SetParameters(9.57477e-01, 2.59267e-04);
-	//gSigma->Draw("AP");
-	gSigma->Fit("fWidth");
-	//fWidth->Draw("same");
-}
-*/

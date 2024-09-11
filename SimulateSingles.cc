@@ -92,4 +92,13 @@ void BuildSimuledSpectra(){
 }
 
 
-
+void WriteSimulation(string filename){
+		
+		TFile *fNew = TFile::Open(filename.c_str(), "RECREATE");
+		hRealSpectra->Write();
+		hFullSim->Write();
+		hBkgr->Write();
+		for(int i = 0; i < used_sources; i++){
+			hSimSource[i]->Write();
+		}
+}
